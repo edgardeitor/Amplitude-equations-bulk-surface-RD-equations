@@ -281,7 +281,7 @@ for lNF in lvalues:
     Sl = Mul(diagonall.dummy.inv(), K)
     
     criticalmat = Add(Mul(K, ilomegaR.dummy, Sl), jacobianmat[nvar:2*nvar, nvar:2*nvar], \
-                      Mul(-1, lNF, lNF + 1, diffmatrix[nvar:2*nvar, nvar:2*nvar]))
+                      Mul(-1, lNF, lNF + 1, Pow(R, -2), diffmatrix[nvar:2*nvar, nvar:2*nvar]))
         
     # The term -K is hiddein inside jacobianmat
     
@@ -502,7 +502,7 @@ for lNF in lvalues:
                             
                             criticalmatp = matrix('coefmatp', nvar, Add(Mul(K, ipomegaR.dummy, Sp),
                                                                         Matrix(jacobianmat[nvar:2*nvar, nvar:2*nvar]),
-                                                                        Mul(-1, p, p+1,
+                                                                        Mul(-1, p, p + 1, Pow(R, -2)),
                                                                             Matrix(diffmatrix[nvar:2*nvar,
                                                                                               nvar:2*nvar]))))
                             
@@ -648,7 +648,7 @@ for lNF in lvalues:
                                         psiNF.dummy.dot(Mul(diff(diffmatrix[nvar:2*nvar, nvar:2*nvar], crosspar),
                                                             Matrix(phiNF.dummy)))))
             
-        C11 = Mul(Pow(integral, -1), Add(firsthellishterm, Mul(-lNF, lNF+1, secondhellishterm)))
+        C11 = Mul(Pow(integral, -1), Add(firsthellishterm, Mul(-lNF, lNF + 1, Pow(R, -2), secondhellishterm)))
         
         for varnum in range(nvar):
             C11 = C11.subs(phiNF.dummy[varnum], phiNF.actualcoord[varnum])
