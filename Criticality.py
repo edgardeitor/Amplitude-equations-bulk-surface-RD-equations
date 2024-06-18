@@ -1,5 +1,5 @@
 from IPython import get_ipython
-get_ipython().magic('reset -sf')
+get_ipython().run_line_magic('reset', '-sf')
 
 import os
 import shutil
@@ -12,6 +12,8 @@ import math
 import json
 from mpmath import findroot
 import copy
+
+# The script runs the file 'name_of_model.py'.
 
 modelname = input('Enter the name of the system you would like to analyze: ')
 
@@ -36,21 +38,25 @@ except:
     
 nvar = len(var)
 
+# The script runs the file 'functions.py'
+
 try:
     exec(open(os.path.dirname(os.path.realpath(__file__)) + '\\functions.py').read())
 except:
     print('File functions.py is not in the same folder as the script you are running')
     exit()
 
-file = open('List of Variables.txt','w')
+file = open('List of Variables.txt', 'w')
+
+# The code defines variables in the bulk by capital letter and variables on the surface with lower case
 
 newvar = [None]*2*nvar
 for varnum in range(nvar):
     try:
-        exec(var[varnum].upper() + ' = symbols(var[varnum].upper(), real=True)')
-        exec(var[varnum].lower() + ' = symbols(var[varnum].lower(), real=True)')
-        newvar[varnum]=eval(var[varnum].upper())
-        newvar[nvar+varnum]=eval(var[varnum].lower())
+        exec(var[varnum].upper() + ' = symbols(var[varnum].upper(), real = True)')
+        exec(var[varnum].lower() + ' = symbols(var[varnum].lower(), real = True)')
+        newvar[varnum] = eval(var[varnum].upper())
+        newvar[nvar+varnum] = eval(var[varnum].lower())
     except:
         print('The script could not define ' + var[varnum] + ' as a variable')
         exit()
@@ -60,6 +66,8 @@ for varnum in range(len(var)):
     file.write(latex(var[varnum]) + '\n')
 file.close()
     
+# The script defines the parameters as symbols in sympy.
+
 try:
     parameters
 except:
@@ -72,13 +80,15 @@ if npar>0:
     newparameters=dict()
     for key in parameters.keys():
         try:
-            exec(key + ' = symbols(key, real=True)')
-            newparameters[eval(key)]=parameters[key]
+            exec(key + ' = symbols(key, real = True)')
+            newparameters[eval(key)] = parameters[key]
         except:
             print('The script could not define your variable ' + key + ' as a variable')
             exit()
     parameters = newparameters
     
+# It defines the diffusion matrix as a symbolic matrix in terms of the parameters of the system.
+
 try:
     diffmatrix
 except:
@@ -103,6 +113,8 @@ file.close()
 
 # Kinetics
 
+# The script defines the list of kinetics as a symbolic matrix in terms of the parameters of the system.
+
 try:
     kinetics
 except:
@@ -111,11 +123,13 @@ except:
 
 for functionnumber in range(2*nvar):
     try:
-        kinetics[functionnumber] = eval(str(kinetics[functionnumber]).replace('^','**'))
+        kinetics[functionnumber] = eval(str(kinetics[functionnumber]).replace('^', '**'))
     except:
         print('The expression ' + kinetics[functionnumber] + 'is not a function of the parameters of your system')
 
 kinetics = Matrix(kinetics)
+
+# The script writes the list of kinetics functions in LaTeX in a text file.
 
 file=open('Kinetics.txt','w')
 for functionnumber in range(2*nvar):
@@ -124,44 +138,48 @@ file.close()
 
 jacobianmat = kinetics.jacobian(var)
 
-if np.count_nonzero(jacobianmat[0:nvar,0:nvar] - np.diag(np.diagonal(jacobianmat[0:nvar, 0:nvar])))>0:
-    print('A is not diagonal')
+# The script checks whether B, K and D_U are diagonal
+
+if np.count_nonzero(jacobianmat[0:nvar, 0:nvar] - np.diag(np.diagonal(jacobianmat[0:nvar, 0:nvar])))>0:
+    print('B is not diagonal')
     exit()
-if np.count_nonzero(jacobianmat[nvar:2*nvar,0:nvar] - np.diag(np.diagonal(jacobianmat[nvar:2*nvar, 0:nvar])))>0:
+if np.count_nonzero(jacobianmat[nvar:2*nvar, 0:nvar] - np.diag(np.diagonal(jacobianmat[nvar:2*nvar, 0:nvar])))>0:
     print('K is not diagonal')
     exit()
-if np.count_nonzero(diffmatrix[0:nvar,0:nvar] - np.diag(np.diagonal(diffmatrix[0:nvar, 0:nvar])))>0:
+if np.count_nonzero(diffmatrix[0:nvar, 0:nvar] - np.diag(np.diagonal(diffmatrix[0:nvar, 0:nvar])))>0:
     print('The diffusion matrix in the bulk is not diagonal')
     exit()
 
-# Equilibria
+# The script defines symbols and variables that will be used to find the coefficients of the normal form
 
-r = symbols('r')
+rNF = symbols('rNF')
 
-B = - jacobianmat[0:nvar, 0:nvar]
+BNF = - jacobianmat[0:nvar, 0:nvar]
 
-K = jacobianmat[nvar:2*nvar, 0:nvar]
+KNF = jacobianmat[nvar:2*nvar, 0:nvar]
 
-omega = zeros(nvar)
-omegaeval = zeros(nvar)
+omegaNF = matrix('omegaNF', nvar, eye(nvar))
+
 for varnum in range(nvar):
-    omega[varnum, varnum] = symbols('omega_' + str(varnum+1))
-    omegaeval[varnum, varnum] = sqrt(Mul(B[varnum, varnum], Pow(diffmatrix[varnum, varnum], -1)))
+    omegaNF.actualcoord[varnum, varnum] = sqrt(Mul(BNF[varnum, varnum], Pow(diffmatrix[varnum, varnum], - 1)))
     
 i0omegar = zeros(nvar)
 i0primeomegaR = zeros(nvar)
 
 for varnum in range(nvar):
-    i0omegar[varnum, varnum] = i_n(0,Mul(omega[varnum, varnum], r))
-    i0primeomegaR[varnum, varnum] = i_n(0,Mul(omega[varnum, varnum], R), derivative=True)
+    i0omegar[varnum, varnum] = i_n(0, Mul(omegaNF.dummy[varnum, varnum], rNF))
+    i0primeomegaR[varnum, varnum] = i_n(0, Mul(omegaNF.dummy[varnum, varnum], R), derivative = True)
     
-i0omegaR = i0omegar.subs(r, R)
+i0omegaR = i0omegar.subs(rNF, R)
 
-diagonal0 = matrix('diag', nvar, Add(Mul(Matrix(diffmatrix[0:nvar, 0:nvar]), i0primeomegaR, omega), Mul(K, i0omegaR)))
+diagonal0 = matrix('diag', nvar, Add(Mul(Matrix(diffmatrix[0:nvar, 0:nvar]), i0primeomegaR, omegaNF.dummy),
+                                     Mul(KNF, i0omegaR)))
 
-S0 = matrix('S0', nvar, Mul(diagonal0.dummy.inv(), K))
+S0 = matrix('S0', nvar, Mul(diagonal0.dummy.inv(), KNF))
 
 Ustar = Mul(i0omegar, S0.dummy, Matrix(var[nvar:2*nvar]))
+
+# The script finds a base state after evaluating the kinetics if requested.
 
 if find_eq=='y':
     kineticsevaluated = Matrix(kinetics[nvar:2*nvar])
@@ -222,84 +240,121 @@ if find_eq=='y':
     
 else:
     eq = []
-
-# Turing conditions and Normal form
                     
+# The script obtains derivatives of the nonlinear vector field up to order three
+
 negativeRHS = Vector('negativeRHS')
 
 firstorderderivatives = list()
 secondorderderivatives = list()
 thirdorderderivatives = list()
 for counter1 in range(nvar, 2*nvar):
-    firstorderderivatives.append(diff(Add(Matrix(kinetics[nvar:2*nvar]), Mul(K, Matrix(var[nvar:2*nvar]))), var[counter1]))
+    firstorderderivatives.append(diff(Add(Matrix(kinetics[nvar:2*nvar]),
+                                          Mul(KNF, Matrix(var[nvar:2*nvar]))), var[counter1]))
     secondorderderivatives.append(list())
     thirdorderderivatives.append(list())
     for counter2 in range(nvar, 2*nvar):
-        secondorderderivatives[counter1-nvar].append(diff(firstorderderivatives[counter1-nvar], var[counter2]))
-        thirdorderderivatives[counter1-nvar].append(list())
+        secondorderderivatives[counter1 - nvar].append(diff(firstorderderivatives[counter1 - nvar],
+                                                            var[counter2]))
+        thirdorderderivatives[counter1 - nvar].append(list())
         for counter3 in range(nvar, 2*nvar):
-            thirdorderderivatives[counter1-nvar][counter2-nvar].append(diff(
-                secondorderderivatives[counter1-nvar][counter2-nvar], var[counter3]))
+            thirdorderderivatives[counter1 - nvar][counter2 - nvar].append(diff(
+                secondorderderivatives[counter1 - nvar][counter2 - nvar], var[counter3]))
 
 # firstorderderivatives does not contain the elements with K
 
 x = symbols('x')
 
-file = open('Values of l.txt','w')
+# The script saves the values of l that are considered in the study
+
+file = open('Values of l.txt', 'w')
 for counter in range(len(lvalues)):
     file.write(str(lvalues[counter]) + '\n')
 file.close()
 
-s = symbols('s')
+sNF = symbols('sNF')
+
+# The calculation below is done for each value of l provided
 
 for lNF in lvalues:
-    phiNF = Vector('phi^NF')
-    psiNF = Vector('psi^NF')
+    phiNF = Vector('phiNF')
+    psiNF = Vector('psiNF')
     
     if not os.path.isdir('l=' + str(lNF)):
         os.mkdir('l=' + str(lNF))
     os.chdir(os.getcwd() + '\\l=' + str(lNF))
     
-    ilomegar = zeros(nvar)
-    ilprimeomegaR = zeros(nvar)
+    # The script creates matrices of coefficients that will be used to obtain third-order coefficients
     
-    i_nuneval = i_n(lNF, r)
-    i_nprimeuneval = i_n(lNF, r, derivative = True)
+    ilomegar = matrix('ilomegar', nvar)
+    ipomegaR = []
+    ipomegaR_eval = []
+    ipprimeomegaR = []
+    ipprimeomegaR_eval = []
+    
+    ipuneval = []
+    ipprimeuneval = []
+    
+    diagonalp = []
+    diagonalp_eval = []
+    Sp = []
+    
+    coefmatp = []
+    
+    for pNF in range(2*lNF + 1):
+        ipomegaR.append(matrix('iomegaR' + str(pNF), nvar))
+        ipprimeomegaR.append(matrix('iprimeomegaR' + str(pNF), nvar))
+        
+        ipuneval.append(i_n(pNF, rNF))
+        ipprimeuneval.append(i_n(pNF, rNF, derivative = True))
+        
+        for varnum in range(nvar):
+            ipomegaR[pNF].actualcoord[varnum, varnum] = ipuneval[pNF].subs(rNF,
+                                                                           Mul(omegaNF.dummy[varnum, varnum], R))
+            ipprimeomegaR[pNF].actualcoord[varnum, varnum] = ipprimeuneval[pNF].subs(rNF,
+                                                                                     Mul(omegaNF.dummy[varnum, varnum],
+                                                                                         R))
+            
+        diagonalp.append(matrix('diag' + str(pNF), nvar, Add(Mul(Matrix(diffmatrix[0:nvar, 0:nvar]),
+                                                                 ipprimeomegaR[pNF].dummy, omegaNF.dummy),
+                                                             Mul(KNF, ipomegaR[pNF].dummy))))
+        
+        Sp.append(Mul(diagonalp[pNF].dummy.inv(), KNF))
+        
+        coefmatp.append(matrix('coefmatp', nvar, Add(Mul(KNF, ipomegaR[pNF].dummy, Sp[pNF]),
+                                                     Matrix(jacobianmat[nvar:2*nvar, nvar:2*nvar]),
+                                                     Mul(- 1, pNF, pNF + 1, Pow(R, - 2),
+                                                         Matrix(diffmatrix[nvar:2*nvar,
+                                                                           nvar:2*nvar])))))
+        
+        diagonalp_eval.append(evaluation_dict(diagonalp[pNF], 'matrix'))
+        ipomegaR_eval.append(evaluation_dict(ipomegaR[pNF], 'matrix'))
+        ipprimeomegaR_eval.append(evaluation_dict(ipprimeomegaR[pNF], 'matrix'))
 
     for varnum in range(nvar):
-        ilomegar[varnum, varnum] = i_nuneval.subs(r, Mul(omega[varnum, varnum], r))
-        ilprimeomegaR[varnum, varnum] = i_nprimeuneval.subs(r, Mul(omega[varnum, varnum], R))
+        ilomegar.actualcoord[varnum, varnum] = ipuneval[lNF].subs(rNF, Mul(omegaNF.dummy[varnum, varnum], rNF))        
         
-    ilomegar = matrix('ilomegar', nvar, ilomegar)
-    ilprimeomegaR = matrix('ilprimeomegaR', nvar, ilprimeomegaR)
-    
-    ilomegaR = matrix('ilomegaR', nvar, ilomegar.actualcoord.subs(r, R))
-    
-    diagonall = matrix('diagl', nvar, Add(Mul(Matrix(diffmatrix[0:nvar, 0:nvar]), ilprimeomegaR.dummy, omega),
-                                          Mul(K, ilomegaR.dummy)))
-    
-    Sl = Mul(diagonall.dummy.inv(), K)
-    
-    criticalmat = Add(Mul(K, ilomegaR.dummy, Sl), jacobianmat[nvar:2*nvar, nvar:2*nvar], \
-                      Mul(-1, lNF, lNF + 1, Pow(R, -2), diffmatrix[nvar:2*nvar, nvar:2*nvar]))
+    omegaNF_eval = evaluation_dict(omegaNF, 'matrix')
         
-    # The term -K is hiddein inside jacobianmat
+    # The term - K is hidden inside jacobianmat
     
-    coefmatl = matrix('coefmatl', nvar, criticalmat)
+    # The script obtains and saves the equation for a Turing bifurcation
+    # The Jacobian matrix can be complicated algebraically so the script computes the determinant of a
+    # dummy matrix to simplify the process.
     
-    criticalmatdet = coefmatl.dummy.det()
+    criticalmatdet = coefmatp[lNF].dummy.det()
     
     for row in range(nvar):
         for col in range(nvar):
-            criticalmatdet = criticalmatdet.subs(coefmatl.dummy[row,col], coefmatl.actualcoord[row,col])
+            criticalmatdet = criticalmatdet.subs(coefmatp[lNF].dummy[row, col],
+                                                 coefmatp[lNF].actualcoord[row, col])
     for varnum in range(nvar):
-        criticalmatdet = criticalmatdet.subs(diagonall.dummy[varnum, varnum], diagonall.actualcoord[varnum, varnum])
-    for varnum in range(nvar):
-        criticalmatdet = criticalmatdet.subs(ilomegaR.dummy[varnum, varnum], ilomegaR.actualcoord[varnum, varnum])
-        criticalmatdet = criticalmatdet.subs(ilprimeomegaR.dummy[varnum, varnum],
-                                             ilprimeomegaR.actualcoord[varnum, varnum])
-    for varnum in range(nvar):
-        criticalmatdet = criticalmatdet.subs(omega[varnum, varnum], omegaeval[varnum, varnum])
+        criticalmatdet = criticalmatdet.subs(diagonalp_eval[lNF]).subs(ipomegaR_eval[lNF])\
+            .subs(ipprimeomegaR_eval[lNF]).subs(omegaNF_eval)
+            
+    # If the script finds at least one steady state, it evaluates the determinant and the Jacobian
+    # matrix at the parameters provided to see whether there is a bifurcation for the value of l the code
+    # is dealing with.
     
     determinanteval = criticalmatdet
     if eq!=[]:
@@ -309,14 +364,17 @@ for lNF in lvalues:
             determinanteval = determinanteval.subs(key, parameters[key])
         tol=1e-6
         if abs(N(determinanteval))<tol:
-            print('There is a Turing bifurcation when l=' + str(lNF) + '.')
+            print('There is a Turing bifurcation for l = ' + str(lNF) + '.')
         
-    file = open('Determinant l=' + str(lNF) + '.txt','w')
+    file = open('Determinant l=' + str(lNF) + '.txt', 'w')
     file.write(latex(criticalmatdet))
     file.close()
     
     if thirdcoef=='y' or crosscoef=='y':
-        getout=0
+        getout = 0
+        
+        # The script looks for an invertible (n - 1) x (n - 1) submatrix of the Jacobian matrix of the system
+        # to obtain a vector that spans its kernel
         
         if eq!=[]:
             for row in range(nvar):
@@ -328,17 +386,9 @@ for lNF in lvalues:
                     invertiblesubmatrix = criticalmat.extract(submatrixrows, submatrixcols)
                     submatrixeval = invertiblesubmatrix
                     for varnum in range(nvar):
-                        submatrixeval = submatrixeval.subs(diagonall.dummy[varnum, varnum],
-                                                           diagonall.actualcoord[varnum, varnum])
-                    for varnum in range(nvar):
-                        submatrixeval = submatrixeval.subs(ilomegaR.dummy[varnum, varnum],
-                                                           ilomegaR.actualcoord[varnum, varnum])
-                        submatrixeval = submatrixeval.subs(ilprimeomegaR.dummy[varnum, varnum],
-                                                           ilprimeomegaR.actualcoord[varnum, varnum])
-                    for varnum in range(nvar):
-                        submatrixeval = submatrixeval.subs(omega[varnum,varnum], omegaeval[varnum,varnum])
-                    for key in parameters:
-                        submatrixeval = submatrixeval.subs(key, parameters[key])
+                        submatrixeval = submatrixeval.subs(diagonalp_eval[lNF]).subs(ipomegaR_eval[lNF])\
+                            .subs(ipprimeomegaR_eval[lNF]).subs(omegaNF_eval)
+                    submatrixeval = submatrixeval.subs(parameters)
                     if eq!=[]:
                         for varnum in range(nvar):
                             submatrixeval = submatrixeval.subs(var[nvar + varnum], eq[nvar + varnum])
@@ -351,42 +401,48 @@ for lNF in lvalues:
                 if getout==1:
                     break
         else:
-            submatrixrows = list(range(1,nvar))
-            submatrixcols = list(range(1,nvar))
-            invertiblesubmatrix = criticalmat.extract(submatrixrows, submatrixcols)
+            submatrixrows = list(range(1, nvar))
+            submatrixcols = list(range(1, nvar))
+            invertiblesubmatrix = coefmatp[lNF].actualcoord.extract(submatrixrows, submatrixcols)
             phiNF.actualcoord[0] = 1
             criticalrow = 0
             criticalcol = 0
             
-        coefsubmatrix = matrix('dummysubmatrix', nvar-1, invertiblesubmatrix)
+        coefsubmatrix = matrix('dummysubmatrix', nvar - 1, invertiblesubmatrix)
+        
+        # The script finds the vector \phi_1^1 that spans the kernel of the Jacobian matrix using dummy matrices.
         
         auxiliaryterm, = linsolve(Add(Mul(coefsubmatrix.dummy, Matrix(phiNF.actualcoord).extract(submatrixcols, [0])), \
-                                      coefmatl.dummy.extract(submatrixrows, [criticalcol])),
+                                      coefmatp[lNF].dummy.extract(submatrixrows, [criticalcol])),
                                   list(Matrix(phiNF.actualcoord).extract(submatrixcols, [0])))
             
         phiNF.actualcoord[0:criticalcol] = auxiliaryterm[0:criticalcol]
-        phiNF.actualcoord[criticalcol+1:nvar] = auxiliaryterm[criticalcol:nvar-1]
+        phiNF.actualcoord[criticalcol + 1:nvar] = auxiliaryterm[criticalcol:nvar - 1]
         
         phiNF.actualcoord = Matrix(phiNF.actualcoord)
         
         for row in range(nvar):
             for col in range(nvar):
-                phiNF.actualcoord = phiNF.actualcoord.subs(coefmatl.dummy[row, col], coefmatl.actualcoord[row, col])
+                phiNF.actualcoord = phiNF.actualcoord.subs(coefmatp[lNF].dummy[row, col],
+                                                           coefmatp[lNF].actualcoord[row, col])
                 if row<nvar-1 and col<nvar-1:
                     phiNF.actualcoord = phiNF.actualcoord.subs(coefsubmatrix.dummy[row, col],
                                                                coefsubmatrix.actualcoord[row, col])
                     
         if phiunit=='y':
-            phiNF.actualcoord = Mul(Pow(phiNF.actualcoord.dot(phiNF.actualcoord), -1), phiNF.actualcoord)
+            phiNF.actualcoord = Mul(Pow(phiNF.actualcoord.dot(phiNF.actualcoord), - 1), phiNF.actualcoord)
         
         print('phiNF ready')
         
+        # The script finds the vector \psi that spans the Kernel of the adjoint of the Jacobian matrix
+        
         Tdummycoefsubmatrix = transpose(coefsubmatrix.dummy)
-        Tdummycoefmatl = transpose(coefmatl.dummy)
+        Tdummycoefmatl = transpose(coefmatp[lNF].dummy)
         
         psiNF.actualcoord[criticalrow] = 1
         
-        auxiliaryterm, = linsolve(Add(Mul(Tdummycoefsubmatrix, Matrix(psiNF.actualcoord).extract(submatrixrows, [0])), \
+        auxiliaryterm, = linsolve(Add(Mul(Tdummycoefsubmatrix, Matrix(psiNF.actualcoord).extract(submatrixrows,
+                                                                                                 [0])),
                                       Tdummycoefmatl.extract(submatrixcols, [criticalrow])),
                                   list(Matrix(psiNF.actualcoord).extract(submatrixrows, [0])))
             
@@ -397,49 +453,49 @@ for lNF in lvalues:
         
         for row in range(nvar):
             for col in range(nvar):
-                psiNF.actualcoord = psiNF.actualcoord.subs(coefmatl.dummy[row, col], coefmatl.actualcoord[row, col])
-                if row<nvar-1 and col<nvar-1:
+                psiNF.actualcoord = psiNF.actualcoord.subs(coefmatp[lNF].dummy[row, col],
+                                                           coefmatp[lNF].actualcoord[row, col])
+                if row<nvar - 1 and col<nvar - 1:
                     psiNF.actualcoord = psiNF.actualcoord.subs(coefsubmatrix.dummy[row, col],
                                                                coefsubmatrix.actualcoord[row, col])
         
         print('psiNF ready')
+        
+        phiNF_eval = evaluation_dict(phiNF)
+        psiNF_eval = evaluation_dict(psiNF)
         
         integral = I_l()
         
         print('Hellish integral done')
     
     if thirdcoef=='y':
-        DS_phiphi = secondorderapplied(phiNF.dummy, phiNF.dummy)
-        
-        if lNF%2==1:
-            TS_phiphiphi = thirdorderapplied(phiNF.dummy, phiNF.dummy, phiNF.dummy)
+        DS_phiphi = secondorderapplied(phiNF, phiNF)
             
         for mNF in range(0, lNF + 1):
+            
+            # If l is even, the script finds second-order coefficients
+            
             if lNF%2==0:
+                
+                # It obtains the set of two grouped numbers that add up to m
+                
                 list_of_q = add_2_up_to_m(lNF, mNF)
                 
                 for part_list in list_of_q:
+                    part_list.sort()
+                    
                     q_1 = part_list[0]
                     q_2 = part_list[1]
                     
                     dl = d_p(lNF, mNF, lNF, q_1, q_2)
                     
-                    C2 = Mul(Pow(R, 2), Pow(integral, -1), dl, psiNF.dummy.dot(DS_phiphi))
+                    C2 = Mul(Pow(R, 2), Pow(integral, - 1), dl, psiNF.dummy.dot(DS_phiphi))
                     
                     if q_1!=q_2:
                         C2 = Mul(2, C2)
                     
-                    for varnum in range(nvar):
-                        C2 = C2.subs(phiNF.dummy[varnum], phiNF.actualcoord[varnum])
-                        C2 = C2.subs(psiNF.dummy[varnum], psiNF.actualcoord[varnum])
-                    for varnum in range(nvar):
-                        C2 = C2.subs(diagonall.dummy[varnum, varnum], diagonall.actualcoord[varnum, varnum])
-                    for varnum in range(nvar):
-                        C2 = C2.subs(ilomegar.dummy[varnum, varnum], ilomegar.actualcoord[varnum, varnum])
-                        C2 = C2.subs(ilomegaR.dummy[varnum, varnum], ilomegaR.actualcoord[varnum, varnum])
-                        C2 = C2.subs(ilprimeomegaR.dummy[varnum, varnum], ilprimeomegaR.actualcoord[varnum, varnum])
-                    for varnum in range(nvar):
-                        C2 = C2.subs(omega[varnum, varnum], omegaeval[varnum, varnum])
+                    C2 = C2.subs(phiNF_eval).subs(psiNF_eval).subs(diagonalp_eval[lNF]).subs(ipomegaR_eval[lNF])\
+                        .subs(ipprimeomegaR_eval[lNF]).subs(omegaNF_eval)
                 
                     file = open('C2 q1=' + str(q_1) + ', q2=' + str(q_2) + ', m=' + str(mNF) + '.txt','w')
                     file.write(latex(C2))
@@ -447,227 +503,221 @@ for lNF in lvalues:
                 
                     print('Second order coefficient ready')
                     
-            else:
-                Nlm = Mul(2, math.factorial(lNF + abs(mNF)), Pow(2*lNF + 1, -1),
-                          Pow(math.factorial(lNF - abs(mNF)), -1))
+            # The script continues to get third-order coefficients
                 
-                list_of_q = add_3_up_to_m(lNF, mNF)
+            TS_phiphiphi = thirdorderapplied(phiNF, phiNF, phiNF)
+                    
+            # It obtains the set of three grouped numbers that add up to m
+            
+            list_of_q = add_3_up_to_m(lNF, mNF)
+            
+            for part_list in list_of_q:
                 
-                for part_list in list_of_q:
+                bigsum = 0
+                
+                for combnum in range(len(set(part_list))):
+                    if len(set(part_list))==3:
+                        q_1 = part_list[(0 + combnum)%3]
+                        q_2 = part_list[(1 + combnum)%3]
                     
-                    bigsum = 0
-                    
-                    for combnum in range(len(set(part_list))):
-                        if len(set(part_list))==3:
-                            q_1 = part_list[(0 + combnum)%3]
-                            q_2 = part_list[(1 + combnum)%3]
+                    elif len(set(part_list))==2:
+                        index = non_repeated_element(part_list)
                         
-                        elif len(set(part_list))==2:
-                            index = non_repeated_element(part_list)
-                            
-                            if combnum==0:
-                                q_1 = part_list[(index + 0)%3]
-                                q_2 = part_list[(index + 1)%3]
-                            else:
-                                q_1 = part_list[(index + 1)%3]
-                                q_2 = part_list[(index + 2)%3]
-                                
+                        if combnum==0:
+                            q_1 = part_list[(index + 0)%3]
+                            q_2 = part_list[(index + 1)%3]
                         else:
-                            q_1 = part_list[0]
-                            q_2 = part_list[1]
-                        
-                        up2 = []
-                        
-                        DS_phiup2 = []
+                            q_1 = part_list[(index + 1)%3]
+                            q_2 = part_list[(index + 2)%3]
+                            
+                    else:
+                        q_1 = part_list[0]
+                        q_2 = part_list[1]
                     
-                        for p in range(abs(q_1 + q_2), 2*lNF + 1):
-                            ipomegaR = zeros(nvar)
-                            ipprimeomegaR = zeros(nvar)
+                    up2 = []
+                    
+                    DS_phiup2 = []
                 
-                            ipuneval = i_n(p, r)
-                            ipprimeuneval = i_n(p, r, derivative = True)
-                
-                            for varnum in range(nvar):
-                                ipomegaR[varnum, varnum] = ipuneval.subs(r, Mul(omega[varnum, varnum], R))
-                                ipprimeomegaR[varnum, varnum] = ipprimeuneval.subs(r, Mul(omega[varnum, varnum], R))
-                                
-                            ipomegaR = matrix('ipomegaR', nvar, ipomegaR)
-                            ipprimeomegaR = matrix('ipprimeomegaR', nvar, ipprimeomegaR)
-                            
-                            diagonalp = matrix('diagp', nvar, Add(Mul(Matrix(diffmatrix[0:nvar,0:nvar]),
-                                                                      ipprimeomegaR.dummy, omega),
-                                                                  Mul(K, ipomegaR.dummy)))
-                            
-                            Sp = Mul(diagonalp.dummy.inv(), K)
-                            
-                            criticalmatp = matrix('coefmatp', nvar, Add(Mul(K, ipomegaR.dummy, Sp),
-                                                                        Matrix(jacobianmat[nvar:2*nvar, nvar:2*nvar]),
-                                                                        Mul(-1, p, p + 1, Pow(R, -2)),
-                                                                            Matrix(diffmatrix[nvar:2*nvar,
-                                                                                              nvar:2*nvar]))))
-                            
-                            dp = d_p(lNF, mNF, p, q_1, q_2)
-                            
-                            up2.append(Vector('up2^' + str(p)))
-                            
-                            if dp==0:
-                                up2[-1].dummy = Matrix([0]*nvar)
-                                up2[-1].actualcoord = Matrix([0]*nvar)
-                            else:
-                                negativeRHS.actualcoord = Mul(dp, DS_phiphi)
-                                up2[-1].actualcoord = linearsolver(up2[-1], negativeRHS, criticalmatp)
-                                
-                                for varnum in range(nvar):
-                                    up2[-1].actualcoord = up2[-1].actualcoord.subs(diagonalp.dummy[varnum, varnum],
-                                                                                   diagonalp.actualcoord[varnum, varnum])
-                                for varnum in range(nvar):
-                                    up2[-1].actualcoord = up2[-1].actualcoord.subs(ipomegaR.dummy[varnum, varnum],
-                                                                                   ipomegaR.actualcoord[varnum, varnum])
-                                    up2[-1].actualcoord = up2[-1].actualcoord.subs(ipprimeomegaR.dummy[varnum, varnum],
-                                                                                   ipprimeomegaR.actualcoord[varnum, varnum])
+                    for pNF in range(abs(q_1 + q_2), 2*lNF + 1):
                         
-                            DS_phiup2.append(secondorderapplied(phiNF.dummy, up2[p - abs(q_1 + q_2)].dummy))
+                        # For each value of p, the code obtains the solutions to the second order equations
                         
-                        print('Second order ready')
-                            
-                        if len(set(part_list))==3:
-                            q_3 = part_list[(2 + combnum)%3]
-                            
-                        elif len(set(part_list))==2:
-                            if combnum==0:
-                                q_3 = part_list[(index + 2)%3]
-                            else:
-                                q_3 = part_list[(index + 0)%3]
-                                
+                        dp = d_p(lNF, mNF, pNF, q_1, q_2)
+                        
+                        up2.append(Vector('up2^' + str(pNF)))
+                        
+                        if dp==0:
+                            up2[- 1].dummy = Matrix([0]*nvar)
+                            up2[- 1].actualcoord = Matrix([0]*nvar)
                         else:
-                            q_3 = part_list[2]
+                            negativeRHS.actualcoord = Mul(dp, DS_phiphi)
+                            if lNF%2==0 and pNF==lNF:
+                                up2[- 1].actualcoord = critical_linearsolver(up2[- 1], negativeRHS,
+                                                                             criticalcol, coefsubmatrix,
+                                                                             submatrixrows, submatrixcols)
+                            else:
+                                up2[- 1].actualcoord = linearsolver(up2[- 1], negativeRHS, coefmatp[pNF])
+                                
+                            up2[- 1].actualcoord = up2[- 1].actualcoord.subs(diagonalp_eval[pNF])\
+                                .subs(ipomegaR_eval[pNF]).subs(ipprimeomegaR_eval[pNF])
+                    
+                        DS_phiup2.append(secondorderapplied(phiNF, up2[pNF - abs(q_1 + q_2)]))
+                    
+                    print('Second order ready')
+                        
+                    if len(set(part_list))==3:
+                        q_3 = part_list[(2 + combnum)%3]
+                        
+                    elif len(set(part_list))==2:
+                        if combnum==0:
+                            q_3 = part_list[(index + 2)%3]
+                        else:
+                            q_3 = part_list[(index + 0)%3]
                             
-                        summation = first_term_C3(lNF, mNF, q_1, q_2, q_3)
+                    else:
+                        q_3 = part_list[2]
                         
-                        for p in range(abs(q_1 + q_2), 2*lNF + 1):
-                            for varnum in range(nvar):
-                                summation = summation.subs(up2[p - abs(q_1 + q_2)].dummy[varnum],
-                                                           up2[p - abs(q_1 + q_2)].actualcoord[varnum])
-                        
-                        print('Hard part ready')
-                        
-                        if q_1!=q_2:
-                            summation = Mul(2, summation)
-                        
-                        bigsum = Add(bigsum, summation)
-                        
-                    legendreintegral = fourth_integral(lNF, mNF, q_1, q_2, q_3)
+                    summation = first_term_C3(lNF, mNF, q_1, q_2, q_3)
                     
-                    second_summand = Mul(TS_phiphiphi, legendreintegral)
+                    for pNF in range(abs(q_1 + q_2), 2*lNF + 1):
+                        for varnum in range(nvar):
+                            summation = summation.subs(up2[pNF - abs(q_1 + q_2)].dummy[varnum],
+                                                       up2[pNF - abs(q_1 + q_2)].actualcoord[varnum])
                     
-                    if len({q_1, q_2, q_3})==3:
-                        second_summand = Mul(6, second_summand)
-                    elif len({q_1, q_2, q_3})==2:
-                        second_summand = Mul(3, second_summand)
+                    print('Hard part ready')
                     
-                    C3 = Mul(Pow(R, 2), Pow(integral, -1), Pow(Nlm, -1),
-                             psiNF.dummy.dot(Add(Mul(2, bigsum), second_summand)))
+                    if q_1!=q_2:
+                        summation = Mul(2, summation)
                     
-                    for varnum in range(nvar):
-                        C3 = C3.subs(phiNF.dummy[varnum], phiNF.actualcoord[varnum])
-                        C3 = C3.subs(psiNF.dummy[varnum], psiNF.actualcoord[varnum])
-                    for varnum in range(nvar):
-                        C3 = C3.subs(diagonall.dummy[varnum, varnum], diagonall.actualcoord[varnum, varnum])
-                    for varnum in range(nvar):
-                        C3 = C3.subs(ilomegar.dummy[varnum, varnum], ilomegar.actualcoord[varnum, varnum])
-                        C3 = C3.subs(ilomegaR.dummy[varnum, varnum], ilomegaR.actualcoord[varnum, varnum])
-                        C3 = C3.subs(ilprimeomegaR.dummy[varnum, varnum],
-                                     ilprimeomegaR.actualcoord[varnum, varnum])
-                    for varnum in range(nvar):
-                        C3 = C3.subs(omega[varnum,varnum], omegaeval[varnum,varnum])
+                    bigsum = Add(bigsum, summation)
+                    
+                # The script computes the third order coefficient for the value of q_1, q_2, q_3 it is dealing
+                # with
+                    
+                legendreintegral = fourth_integral(lNF, mNF, q_1, q_2, q_3)
+                
+                second_summand = Mul(TS_phiphiphi, legendreintegral)
+                
+                if len({q_1, q_2, q_3})==3:
+                    second_summand = Mul(6, second_summand)
+                elif len({q_1, q_2, q_3})==2:
+                    second_summand = Mul(3, second_summand)
+                    
+                # The script computes the third order coefficient and saves it into a .txt file
+                
+                C3 = Mul(Pow(R, 2), Pow(integral, - 1), psiNF.dummy.dot(Add(Mul(2, bigsum), second_summand)))
+                
+                C3 = C3.subs(phiNF_eval).subs(psiNF_eval).subs(diagonalp_eval[lNF]).subs(ipomegaR_eval[lNF])\
+                    .subs(ipprimeomegaR_eval[lNF]).subs(omegaNF_eval)
+                    
+                sorting = [q_1, q_2, q_3]
+                sorting.sort()
+                    
+                file = open('C3 q1=' + str(sorting[0]) + ', q2=' + str(sorting[1]) + ', q3='\
+                            + str(sorting[2]) + ', m=' +
+                            str(mNF) + '.txt', 'w')
+                file.write(latex(C3))
+                file.close()
                         
-                    file = open('C3 q1=' + str(q_1) + ', q2=' + str(q_2) + ', q3=' + str(q_3) + ', m=' +
-                                str(mNF) + '.txt','w')
-                    file.write(latex(C3))
-                    file.close()
-                            
-                    print('Third order coefficient ready')
+                print('Third order coefficient ready')
+    
+    # If requested, the code computes the terms necessary for Mathematica to get the cross-order coefficient
     
     if crosscoef=='y':
         try:
             crosspar = eval(crosspar)
-            for varnum in range(len(equilibrium)):
-                equilibrium[varnum] = eval(equilibrium[varnum])
         except:
             if lNF==lvalues[0]:
-                print('The Cross parameter or equilibrium were not provided in the right way')
-        
-        # kineticsevaluated = Matrix(kinetics[nvar:2*nvar])
-        # for varnum in range(nvar):
-        #     kineticsevaluated = kineticsevaluated.subs(var[varnum],
-        #                                                Mul(i0omegaR[varnum,varnum], S0.dummy[varnum,varnum],
-        #                                                    var[nvar + varnum]))
-        # for varnum in range(nvar):
-        #     kineticsevaluated = kineticsevaluated.subs(omega[varnum, varnum], omegaeval[varnum, varnum])
-        # for key in parameters:
-        #     if key!=crosspar:
-        #         kineticsevaluated = kineticsevaluated.subs(key, parameters[key])
-        # equilibrium = solve(kineticsevaluated, var[nvar:2*nvar])[0]
-                    
-        SS_phi = crossorderapplied(phiNF.dummy, crosspar, equilibrium)
+                print('The Cross parameter was not provided in the right way')
         
         firsthellishterm = 0
         
-        if diff(B, crosspar)!=zeros(nvar):
+        if diff(BNF, crosspar)!=zeros(nvar):
             for varnum in range(nvar):
                 firsthellishterm = Add(firsthellishterm,
-                                        Mul(-diff(B[varnum, varnum], crosspar), Pow(Sl[varnum, varnum], 2),
-                                            phiNF.dummy[varnum], psiNF.dummy[varnum], Pow(omega[varnum, varnum], -3),
-                                            integrate(Mul(Pow(ilomegar.actualcoord[varnum, varnum].
-                                                              subs(r, Mul(s, Pow(omega[varnum, varnum], -1))), 2),
-                                                          Pow(s, 2)), (s, 0, omega[varnum, varnum] * R))))
+                                       Mul(- diff(B[varnum, varnum], crosspar), Pow(Sp[lNF][varnum, varnum], 2),
+                                           phiNF.dummy[varnum], psiNF.dummy[varnum],
+                                           Pow(omegaNF.dummy[varnum, varnum], - 3),
+                                           integrate(Mul(Pow(ipomegar[lNF].actualcoord[varnum, varnum].
+                                                             subs(r, Mul(s, Pow(omegaNF.dummy[varnum, varnum], - 1))),
+                                                             2), Pow(s, 2)), (s, 0, Mul(omegaNF.dummy[varnum, varnum], R)))))
         
-        firsthellishterm = Add(firsthellishterm, Mul(Pow(R, 2), psiNF.dummy.dot(SS_phi)))
-        
-        if diff(K, crosspar)!=zeros(nvar):
+        if diff(KNF, crosspar)!=zeros(nvar):
             firsthellishterm = Add(firsthellishterm, Mul(Pow(R, 2),
-                                                          psiNF.dummy.dot(Mul(-diff(K, crosspar),
-                                                                              Add(phiNF.dummy,
-                                                                                  Mul(-1, ilomegaR.dummy,
-                                                                                      Sl, phiNF.dummy))))))
+                                                         psiNF.dummy.dot(Mul(- diff(KNF, crosspar),
+                                                                             Add(phiNF.dummy,
+                                                                                 Mul(- 1, ipomegaR[lNF].dummy,
+                                                                                     Sp[lNF], phiNF.dummy))))))
         
         secondhellishterm = 0
         
         if diff(Matrix(diffmatrix[0:nvar, 0:nvar]), crosspar)!=zeros(nvar):
             for varnum in range(nvar):
                 secondhellishterm = Add(secondhellishterm,
-                                        Mul(diff(diffmatrix[varnum, varnum], crosspar), Pow(Sl[varnum, varnum], 2),
-                                            phiNF.dummy[varnum], psiNF.dummy[varnum], Pow(omega[varnum, varnum], -3),
-                                            integrate(Mul(Pow(ilomegar.actualcoord[varnum, varnum].
-                                                              subs(r, Mul(s, Pow(omega[varnum, varnum], -1))), 2),
-                                                          Pow(s, 2)), (s, 0, omega[varnum, varnum] * R))))
+                                        Mul(diff(diffmatrix[varnum, varnum], crosspar), Pow(Sp[lNF][varnum, varnum], 2),
+                                            phiNF.dummy[varnum], psiNF.dummy[varnum], Pow(omegaNF.dummy[varnum, varnum], - 3),
+                                            integrate(Mul(Pow(ipomegar[lNF].actualcoord[varnum, varnum].
+                                                              subs(r, Mul(s, Pow(omegaNF.dummy[varnum, varnum], -1))), 2),
+                                                          Pow(s, 2)), (s, 0, Mul(omegaNF.dummy[varnum, varnum], R)))))
                 
         if diff(Matrix(diffmatrix[nvar:2*nvar, nvar:2*nvar]), crosspar)!=zeros(nvar):
             secondhellishterm = Add(secondhellishterm,
-                                    Mul(Pow(R,2),
+                                    Mul(Pow(R, 2),
                                         psiNF.dummy.dot(Mul(diff(diffmatrix[nvar:2*nvar, nvar:2*nvar], crosspar),
                                                             Matrix(phiNF.dummy)))))
+        
+        extraterm = Mul(Pow(R, 2), Pow(integral, - 1))
+        
+        termtodiff = crossorderapplied(phiNF)
+        termtodiff = psiNF.dummy.dot(termtodiff)
+        
+        # The script computes and saves the variables needed to compute C11 if requested
             
-        C11 = Mul(Pow(integral, -1), Add(firsthellishterm, Mul(-lNF, lNF + 1, Pow(R, -2), secondhellishterm)))
+        C11 = Mul(Pow(integral, - 1), Add(firsthellishterm, Mul(- lNF, lNF + 1, Pow(R, - 2), secondhellishterm)))
         
-        for varnum in range(nvar):
-            C11 = C11.subs(phiNF.dummy[varnum], phiNF.actualcoord[varnum])
-            C11 = C11.subs(psiNF.dummy[varnum], psiNF.actualcoord[varnum])
-        for varnum in range(nvar):
-            C11 = C11.subs(diagonall.dummy[varnum, varnum], diagonall.actualcoord[varnum, varnum])    
-        for varnum in range(nvar):
-            C11 = C11.subs(ilomegar.dummy[varnum, varnum], ilomegar.actualcoord[varnum, varnum])
-            C11 = C11.subs(ilomegaR.dummy[varnum, varnum], ilomegaR.actualcoord[varnum, varnum])
-            C11 = C11.subs(ilprimeomegaR.dummy[varnum, varnum],
-                         ilprimeomegaR.actualcoord[varnum, varnum])
-        for varnum in range(nvar):
-            C11 = C11.subs(omega[varnum, varnum], omegaeval[varnum, varnum])
+        C11 = C11.subs(phiNF_eval).subs(psiNF_eval).subs(diagonalp_eval[lNF]).subs(ipomegaR_eval[lNF])\
+            .subs(ipprimeomegaR_eval[lNF]).subs(omegaNF_eval)
+            
+        extraterm = extraterm.subs(phiNF_eval).subs(psiNF_eval).subs(diagonalp_eval[lNF])\
+            .subs(ipomegaR_eval[lNF]).subs(ipprimeomegaR_eval[lNF]).subs(omegaNF_eval)
         
-        file = open('Cross-order coefficient l=' + str(lNF) + '.txt','w')        
+        phiNF.actualcoord = phiNF.actualcoord.subs(diagonalp_eval[lNF]).subs(ipomegaR_eval[lNF])\
+            .subs(ipprimeomegaR_eval[lNF]).subs(omegaNF_eval)
+            
+        psiNF.actualcoord = psiNF.actualcoord.subs(diagonalp_eval[lNF]).subs(ipomegaR_eval[lNF])\
+            .subs(ipprimeomegaR_eval[lNF]).subs(omegaNF_eval)
+            
+        
+        file = open('Simple part of cross-order coefficient l=' + str(lNF) + '.txt', 'w')
         file.write(latex(C11))
+        file.close()
+        
+        file = open('Kernels.txt', 'w')
+        for varnum in range(nvar):
+            if varnum<nvar - 1:
+                file.write(latex(phiNF.actualcoord[varnum]) + ',')
+            else:
+                file.write(latex(phiNF.actualcoord[varnum]) + '\n')
+        for varnum in range(nvar):
+            if varnum<nvar - 1:
+                file.write(latex(psiNF.actualcoord[varnum]) + ',')
+            else:
+                file.write(latex(psiNF.actualcoord[varnum]))
+        file.close()
+        
+        file = open('Factor to get cross-order coefficient l=' + str(lNF) + '.txt', 'w')
+        file.write(latex(extraterm))
+        file.close()
+        
+        file = open('Term to differentiate to get cross-order coefficient l=' + str(lNF) + '.txt', 'w')
+        file.write(latex(crosspar) + '\n')
+        file.write(latex(termtodiff))
         file.close()
     
     os.chdir(os.path.dirname(os.getcwd()))
+    
+# The sript saves text files with all the information required by Mathematica to find and plot the
+# bifurcation diagram
     
 if plot2d=='y':
     try:

@@ -22,7 +22,7 @@ kinetics=["-sigma1*U",
         "xi/delta - c*u + u**2*v - K1*(u - U)",
         "(c - 1)*u - u**2*v - K2*(v - V)"]
 
-lvalues = [1,2,3,4]
+lvalues = [1, 2, 3, 4]
 
 tol=1e-7
 
@@ -32,17 +32,15 @@ phiunit='n'
 
 thirdcoef = 'y'
 
-crosscoef = 'n'
+crosscoef = 'y'
 
-crosspar = ''
-
-equilibrium=['','']
+crosspar = 'c'
 
 plot2d='y'
 
-parameters_on_axes=['c','delta']
+parameters_on_axes = ['c', 'delta']
 
-names_of_parameters=[]
+names_of_parameters = ['gamma', 'delta']
 
 intervalx=[4, 15]
 
