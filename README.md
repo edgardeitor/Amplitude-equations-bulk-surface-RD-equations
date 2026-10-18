@@ -1,4 +1,7 @@
 # Amplitude-equations-bulk-surface-RD-equations
+
+Villar-Sepúlveda, E., Champneys, A. R., Cusseddu, D., & Madzvamuse, A. (2026). Pattern formation of bulk-surface reaction-diffusion systems in a ball. SIAM Journal on Applied Mathematics, 86(1), 21-51.
+
 Scripts to compute the amplitude equations in a bulk-surface RD equation in a ball.
 
 To get the coefficients of the amplitude equations, create a 'foo.py' file and place it into a folder called 'foo'. Said file must have the same format as the '.py' files in the 'demos' folder or 'name_of_folder.py'. Speficially, you need to provide the kinetics and the diffusion matrix of your system, together with names and values of parameters you would like to study in your bifurcation diagram.
